@@ -1,263 +1,178 @@
-// HiddenGems Page - Local hidden gems discovery
+// HiddenGems Page - Discovery platform with glassmorphism cards
 import React, { useState, useEffect } from 'react';
-import { Star, Search, MapPin, Plus, Heart, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Star, Search, MapPin, Plus, Heart, TrendingUp, Filter, Sparkles, Loader2 } from 'lucide-react';
 import { hiddenGemsApi } from '../services/api';
+import AnimatedPage, { StaggerContainer, staggerItem } from '../components/ui/AnimatedPage';
+import GlassCard from '../components/ui/GlassCard';
+
+const categories = ['All', 'Cafés', 'Viewpoints', 'Streets', 'Beaches', 'Markets', 'Parks', 'Temples'];
+
+const demoGems = [
+  { id: 1, name: 'Moonlight Terrace', category: 'Viewpoints', location: 'Santorini, Greece', rating: 4.9, likes: 342, description: 'Secret sunset spot with panoramic caldera views, away from the tourist crowds.' },
+  { id: 2, name: 'Café Sakura', category: 'Cafés', location: 'Kyoto, Japan', rating: 4.8, likes: 287, description: 'Hidden garden café in a restored machiya, serving matcha from a local farm.' },
+  { id: 3, name: 'Night Bazaar Alley', category: 'Markets', location: 'Bangkok, Thailand', rating: 4.7, likes: 456, description: 'Locals-only night market with incredible street food and vintage finds.' },
+  { id: 4, name: 'Emerald Pool', category: 'Beaches', location: 'Krabi, Thailand', rating: 4.9, likes: 523, description: 'Crystal-clear natural pool tucked inside a tropical forest, zero tourists.' },
+  { id: 5, name: 'Artist Loop', category: 'Streets', location: 'Barcelona, Spain', rating: 4.6, likes: 198, description: 'Winding street with stunning murals and hidden gallery doors.' },
+  { id: 6, name: 'Zen Garden Retreat', category: 'Parks', location: 'Tokyo, Japan', rating: 4.8, likes: 312, description: 'Tiny zen garden behind a residential area — the most peaceful spot in Shinjuku.' },
+];
 
 function HiddenGems() {
-  const [city, setCity] = useState('');
-  const [gems, setGems] = useState([]);
-  const [featured, setFeatured] = useState([]);
+  const [gems, setGems] = useState(demoGems);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
   const [isLoading, setIsLoading] = useState(false);
-  const [showSubmitForm, setShowSubmitForm] = useState(false);
-  
-  useEffect(() => {
-    loadFeatured();
-  }, []);
-  
-  const loadFeatured = async () => {
-    try {
-      const data = await hiddenGemsApi.getFeatured();
-      setFeatured(data);
-    } catch (error) {
-      console.error('Failed to load featured gems:', error);
-    }
-  };
-  
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!city) return;
-    
-    setIsLoading(true);
-    try {
-      const data = await hiddenGemsApi.getByCity(city);
-      setGems(data);
-    } catch (error) {
-      console.error('Failed to load gems:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const [submitForm, setSubmitForm] = useState({
-    name: '',
-    city: '',
-    description: '',
-    category: 'food',
-    local_tip: '',
+  const [showSubmit, setShowSubmit] = useState(false);
+  const [likedGems, setLikedGems] = useState(new Set());
+
+  // Submission form state
+  const [newGem, setNewGem] = useState({
+    name: '', category: '', location: '', description: '',
   });
-  
+
+  const filteredGems = gems.filter(g => {
+    const matchesSearch = g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.location.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategory === 'All' || g.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const toggleLike = (id) => {
+    setLikedGems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await hiddenGemsApi.submit({
-        ...submitForm,
-        location: { lat: 0, lng: 0 },
-        submitted_by: 'anonymous',
-      });
-      alert('Hidden gem submitted for review!');
-      setShowSubmitForm(false);
-      setSubmitForm({ name: '', city: '', description: '', category: 'food', local_tip: '' });
-    } catch (error) {
-      console.error('Failed to submit gem:', error);
+      await hiddenGemsApi.submit(newGem);
+      setShowSubmit(false);
+      setNewGem({ name: '', category: '', location: '', description: '' });
+    } catch (err) {
+      console.error(err);
     }
   };
-  
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AnimatedPage className="max-w-7xl mx-auto px-4 py-8 pb-24">
       {/* Header */}
-      <header className="bg-gradient-to-r from-accent-600 to-accent-500 text-white py-12">
-        <div className="max-w-6xl mx-auto px-4">
-          <h1 className="text-3xl font-bold mb-4 flex items-center gap-3">
-            <Star size={32} />
-            Hidden Gems
-          </h1>
-          <p className="text-accent-100 text-lg">
-            Discover local favorites that tourists miss
-          </p>
-          
-          {/* Search */}
-          <form onSubmit={handleSearch} className="mt-6">
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Search city..."
-                  className="w-full pl-12 pr-4 py-3 rounded-xl text-gray-900 focus:ring-2 focus:ring-accent-300 outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="px-6 py-3 bg-white text-accent-600 rounded-xl font-semibold hover:bg-accent-50 transition-colors"
-              >
-                Discover
-              </button>
-            </div>
-          </form>
+      <motion.div className="text-center mb-10" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-amber-500/20">
+          <Sparkles size={24} className="text-white" />
         </div>
-      </header>
-      
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Featured gems */}
-        {featured.length > 0 && !gems.length && (
-          <section className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <TrendingUp className="text-accent-500" />
-              Featured Hidden Gems
-            </h2>
-            <div className="grid md:grid-cols-3 gap-6">
-              {featured.map((gem) => (
-                <div key={gem.id} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{gem.name}</h3>
-                      <p className="text-sm text-gray-500">{gem.city}</p>
-                    </div>
-                    <span className="px-2 py-1 bg-accent-100 text-accent-700 rounded-full text-xs">
-                      {gem.category}
-                    </span>
-                  </div>
-                  <p className="text-gray-600 text-sm mb-3">{gem.description}</p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Star size={14} className="text-yellow-500 fill-yellow-500" />
-                    <span className="font-medium">{gem.rating}</span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-500">Low popularity</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-        
-        {/* Search results */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-10 h-10 border-4 border-accent-500 border-t-transparent rounded-full" />
-          </div>
-        ) : gems.length > 0 ? (
-          <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Hidden Gems in {city}
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {gems.map((gem) => (
-                <div key={gem.gemId || gem.id} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{gem.name}</h3>
-                      <span className="text-xs text-gray-500 uppercase">{gem.category}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-yellow-500">
-                      <Star size={16} className="fill-yellow-500" />
-                      <span className="font-medium text-gray-900">{gem.rating}</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 text-sm mb-3">{gem.description}</p>
-                  {gem.localTip && (
-                    <div className="bg-accent-50 rounded-lg p-3 text-sm">
-                      <span className="font-medium text-accent-700">Local tip: </span>
-                      <span className="text-accent-600">{gem.localTip}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-        
-        {/* Submit button */}
-        <button
-          onClick={() => setShowSubmitForm(!showSubmitForm)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-accent-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-accent-600 transition-colors"
-        >
-          <Plus size={24} />
+        <h1 className="text-3xl font-bold text-surface-900 dark:text-surface-100">Hidden Gems</h1>
+        <p className="text-surface-500 dark:text-surface-400 mt-2">Discover local favorites and secret spots worldwide</p>
+      </motion.div>
+
+      {/* Search & Filter */}
+      <div className="mb-8 space-y-4">
+        <div className="relative max-w-lg mx-auto">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="input-field pl-12 pr-4"
+            placeholder="Search gems by name or location..."
+          />
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar">
+          {categories.map(cat => (
+            <button key={cat} onClick={() => setActiveCategory(cat)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${activeCategory === cat
+                  ? 'bg-primary-500 text-white shadow-md'
+                  : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+                }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Add Gem Button */}
+      <div className="flex justify-end mb-6">
+        <button onClick={() => setShowSubmit(!showSubmit)} className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={16} />
+          Submit a Gem
         </button>
-        
-        {/* Submit form modal */}
-        {showSubmitForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Submit a Hidden Gem</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Place Name</label>
-                  <input
-                    type="text"
-                    value={submitForm.name}
-                    onChange={(e) => setSubmitForm({ ...submitForm, name: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-accent-500 outline-none"
-                  />
+      </div>
+
+      {/* Submit Form */}
+      {showSubmit && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mb-8">
+          <GlassCard hover={false}>
+            <h3 className="font-semibold text-surface-900 dark:text-surface-100 mb-4">Share Your Discovery</h3>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <input type="text" value={newGem.name} onChange={e => setNewGem(p => ({ ...p, name: e.target.value }))}
+                className="input-field" placeholder="Gem name" required />
+              <select value={newGem.category} onChange={e => setNewGem(p => ({ ...p, category: e.target.value }))}
+                className="input-field" required>
+                <option value="">Category</option>
+                {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input type="text" value={newGem.location} onChange={e => setNewGem(p => ({ ...p, location: e.target.value }))}
+                className="input-field" placeholder="Location (City, Country)" required />
+              <textarea value={newGem.description} onChange={e => setNewGem(p => ({ ...p, description: e.target.value }))}
+                className="input-field resize-none" placeholder="Describe this hidden gem..." rows={2} required />
+              <div className="sm:col-span-2 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowSubmit(false)} className="btn-secondary text-sm">Cancel</button>
+                <button type="submit" className="btn-primary text-sm">Submit Gem</button>
+              </div>
+            </form>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Gems Grid */}
+      <StaggerContainer className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredGems.map(gem => (
+          <motion.div key={gem.id} variants={staggerItem}>
+            <GlassCard className="h-full" hover>
+              <div className="flex items-start justify-between mb-3">
+                <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-medium">
+                  {gem.category}
+                </span>
+                <button onClick={() => toggleLike(gem.id)} className="p-1.5 rounded-full hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors">
+                  <Heart size={18} className={likedGems.has(gem.id) ? 'text-rose-500 fill-rose-500' : 'text-surface-400'} />
+                </button>
+              </div>
+
+              <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-1">{gem.name}</h3>
+              <p className="text-sm text-surface-500 dark:text-surface-400 flex items-center gap-1 mb-3">
+                <MapPin size={14} />
+                {gem.location}
+              </p>
+              <p className="text-sm text-surface-600 dark:text-surface-300 leading-relaxed mb-4">{gem.description}</p>
+
+              <div className="flex items-center justify-between pt-3 border-t border-surface-100 dark:border-surface-700">
+                <div className="flex items-center gap-1">
+                  <Star size={14} className="text-amber-400 fill-amber-400" />
+                  <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{gem.rating}</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    value={submitForm.city}
-                    onChange={(e) => setSubmitForm({ ...submitForm, city: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-accent-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select
-                    value={submitForm.category}
-                    onChange={(e) => setSubmitForm({ ...submitForm, category: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-accent-500 outline-none"
-                  >
-                    <option value="food">Food</option>
-                    <option value="nature">Nature</option>
-                    <option value="culture">Culture</option>
-                    <option value="nightlife">Nightlife</option>
-                    <option value="shopping">Shopping</option>
-                    <option value="viewpoint">Viewpoint</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
-                    value={submitForm.description}
-                    onChange={(e) => setSubmitForm({ ...submitForm, description: e.target.value })}
-                    required
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-accent-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Local Tip</label>
-                  <input
-                    type="text"
-                    value={submitForm.local_tip}
-                    onChange={(e) => setSubmitForm({ ...submitForm, local_tip: e.target.value })}
-                    placeholder="Any insider advice?"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-accent-500 outline-none"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowSubmitForm(false)}
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-accent-600"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </form>
-            </div>
+                <span className="text-xs text-surface-400 flex items-center gap-1">
+                  <Heart size={12} />
+                  {gem.likes + (likedGems.has(gem.id) ? 1 : 0)} likes
+                </span>
+              </div>
+            </GlassCard>
+          </motion.div>
+        ))}
+      </StaggerContainer>
+
+      {filteredGems.length === 0 && (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center mx-auto mb-4">
+            <Search size={28} className="text-surface-400" />
           </div>
-        )}
-      </main>
-    </div>
+          <p className="text-surface-500 dark:text-surface-400">No gems found matching your search.</p>
+        </div>
+      )}
+    </AnimatedPage>
   );
 }
 

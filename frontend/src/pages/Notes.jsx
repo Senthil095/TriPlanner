@@ -1,216 +1,203 @@
-// Notes Page - Trip notes with reminders
+// Notes Page - Personal travel notes with glassmorphism
 import React, { useState, useEffect } from 'react';
-import { StickyNote, Plus, Clock, MapPin, Trash2, Bell } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { StickyNote, Plus, Trash2, Search, Filter, Calendar, MapPin, X, Loader2 } from 'lucide-react';
 import { useTrip } from '../context/TripContext';
 import { notesApi } from '../services/api';
+import AnimatedPage, { StaggerContainer, staggerItem } from '../components/ui/AnimatedPage';
+import GlassCard from '../components/ui/GlassCard';
+
+const noteColors = [
+  'from-amber-400 to-orange-400',
+  'from-blue-400 to-indigo-400',
+  'from-emerald-400 to-teal-400',
+  'from-pink-400 to-rose-400',
+  'from-violet-400 to-purple-400',
+  'from-cyan-400 to-sky-400',
+];
 
 function Notes() {
-  const { state, actions } = useTrip();
-  const [notes, setNotes] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [newNote, setNewNote] = useState({
-    content: '',
-    reminder_time: '',
-    has_reminder: false,
-  });
-  
-  const tripId = state.currentTrip?.trip_id;
-  
+  const { state, dispatch } = useTrip();
+  const [isAdding, setIsAdding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [newNote, setNewNote] = useState({ title: '', content: '', location: '' });
+
   useEffect(() => {
-    if (tripId) {
-      loadNotes();
-    }
-  }, [tripId]);
-  
+    loadNotes();
+  }, []);
+
   const loadNotes = async () => {
+    setIsLoading(true);
     try {
-      const data = await notesApi.getByTrip(tripId);
-      setNotes(data);
-    } catch (error) {
-      // Load from offline storage
-      await actions.loadNotes(tripId);
-      setNotes(state.notes);
+      const res = await notesApi.getAll();
+      if (res.data) dispatch({ type: 'SET_NOTES', payload: res.data });
+    } catch {
+      // Use existing notes from state
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-  const handleCreate = async (e) => {
+
+  const handleAddNote = async (e) => {
     e.preventDefault();
-    
-    const noteData = {
-      trip_id: tripId || 'local',
-      content: newNote.content,
-      reminder_time: newNote.has_reminder && newNote.reminder_time ? new Date(newNote.reminder_time).toISOString() : null,
+    if (!newNote.title.trim()) return;
+
+    const note = {
+      ...newNote,
+      id: Date.now(),
+      color: noteColors[Math.floor(Math.random() * noteColors.length)],
+      createdAt: new Date().toISOString(),
     };
-    
+
+    dispatch({ type: 'ADD_NOTE', payload: note });
     try {
-      const result = await notesApi.create(noteData);
-      const createdNote = {
-        id: result.note_id,
-        ...noteData,
-        created_at: new Date().toISOString(),
-      };
-      setNotes([...notes, createdNote]);
-      await actions.addNote(createdNote);
-    } catch (error) {
-      // Save offline
-      const localNote = {
-        id: `local-${Date.now()}`,
-        ...noteData,
-        created_at: new Date().toISOString(),
-      };
-      setNotes([...notes, localNote]);
-      await actions.addNote(localNote);
+      await notesApi.create(note);
+    } catch {
+      // Saved locally
     }
-    
-    setNewNote({ content: '', reminder_time: '', has_reminder: false });
-    setShowForm(false);
+    setNewNote({ title: '', content: '', location: '' });
+    setIsAdding(false);
   };
-  
-  const handleDelete = async (noteId) => {
+
+  const handleDeleteNote = async (noteId) => {
+    dispatch({ type: 'DELETE_NOTE', payload: noteId });
     try {
       await notesApi.delete(noteId);
-    } catch (error) {
-      console.error('Failed to delete note:', error);
+    } catch {
+      // Deleted locally
     }
-    setNotes(notes.filter((n) => n.id !== noteId));
-    await actions.deleteNote(noteId);
   };
-  
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleString();
-  };
-  
+
+  const filteredNotes = (state.notes || []).filter(n =>
+    n.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    n.content?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AnimatedPage className="max-w-5xl mx-auto px-4 py-8 pb-24">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 py-6">
-        <div className="max-w-4xl mx-auto px-4">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <StickyNote className="text-yellow-500" />
-            Trip Notes
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+            <StickyNote size={24} className="text-amber-500" />
+            My Notes
           </h1>
-          <p className="text-gray-600 mt-1">
-            Keep track of important information for your trip
+          <p className="text-surface-500 dark:text-surface-400 text-sm mt-1">
+            {filteredNotes.length} note{filteredNotes.length !== 1 ? 's' : ''}
           </p>
         </div>
-      </header>
-      
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Notes grid */}
-        {notes.length > 0 ? (
-          <div className="grid md:grid-cols-2 gap-4 mb-20">
-            {notes.map((note) => (
-              <div
-                key={note.id}
-                className="bg-yellow-50 rounded-xl p-5 shadow-sm border border-yellow-100 relative group"
-              >
-                <button
-                  onClick={() => handleDelete(note.id)}
-                  className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 size={18} />
-                </button>
-                
-                <p className="text-gray-800 whitespace-pre-wrap mb-4">{note.content}</p>
-                
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  {note.reminder_time && (
-                    <div className="flex items-center gap-1">
-                      <Bell size={14} className="text-yellow-600" />
-                      <span>{formatDate(note.reminder_time)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <Clock size={14} />
-                    <span>{formatDate(note.created_at)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <StickyNote size={64} className="mx-auto text-gray-300 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">No Notes Yet</h2>
-            <p className="text-gray-600 mb-4">
-              Add notes to remember important details about your trip
-            </p>
-          </div>
-        )}
-        
-        {/* Add note button */}
-        <button
-          onClick={() => setShowForm(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-yellow-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-yellow-600 transition-colors"
-        >
-          <Plus size={24} />
+        <button onClick={() => setIsAdding(true)} className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={16} /> New Note
         </button>
-        
-        {/* Add note form modal */}
-        {showForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Add Note</h2>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
-                  <textarea
-                    value={newNote.content}
-                    onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
-                    required
-                    rows={4}
-                    placeholder="What do you want to remember?"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none resize-none"
-                  />
-                </div>
-                
-                <div className="flex items-center gap-2">
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md mb-6">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="input-field pl-10"
+          placeholder="Search notes..."
+        />
+      </div>
+
+      {/* Add Note Modal */}
+      <AnimatePresence>
+        {isAdding && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-8 overflow-hidden"
+          >
+            <GlassCard hover={false}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-surface-900 dark:text-surface-100">New Note</h3>
+                <button onClick={() => setIsAdding(false)} className="p-1 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700">
+                  <X size={18} className="text-surface-400" />
+                </button>
+              </div>
+              <form onSubmit={handleAddNote} className="space-y-4">
+                <input
+                  type="text" value={newNote.title}
+                  onChange={e => setNewNote(p => ({ ...p, title: e.target.value }))}
+                  className="input-field" placeholder="Note title" required autoFocus
+                />
+                <div className="relative">
+                  <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400" />
                   <input
-                    type="checkbox"
-                    id="has_reminder"
-                    checked={newNote.has_reminder}
-                    onChange={(e) => setNewNote({ ...newNote, has_reminder: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500"
+                    type="text" value={newNote.location}
+                    onChange={e => setNewNote(p => ({ ...p, location: e.target.value }))}
+                    className="input-field pl-10" placeholder="Location (optional)"
                   />
-                  <label htmlFor="has_reminder" className="text-sm text-gray-700">
-                    Set a reminder
-                  </label>
                 </div>
-                
-                {newNote.has_reminder && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reminder Time</label>
-                    <input
-                      type="datetime-local"
-                      value={newNote.reminder_time}
-                      onChange={(e) => setNewNote({ ...newNote, reminder_time: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none"
-                    />
-                  </div>
-                )}
-                
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                  >
-                    Save Note
-                  </button>
+                <textarea
+                  value={newNote.content}
+                  onChange={e => setNewNote(p => ({ ...p, content: e.target.value }))}
+                  className="input-field resize-none min-h-[120px]"
+                  placeholder="Write your thoughts, tips, memories..." rows={5}
+                />
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsAdding(false)} className="btn-secondary text-sm">Cancel</button>
+                  <button type="submit" className="btn-primary text-sm">Save Note</button>
                 </div>
               </form>
-            </div>
-          </div>
+            </GlassCard>
+          </motion.div>
         )}
-      </main>
-    </div>
+      </AnimatePresence>
+
+      {/* Notes Grid */}
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 size={28} className="animate-spin text-primary-500" />
+        </div>
+      ) : filteredNotes.length > 0 ? (
+        <StaggerContainer className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredNotes.map(note => (
+            <motion.div key={note.id} variants={staggerItem}>
+              <GlassCard className="h-full group" hover>
+                <div className={`w-full h-1.5 rounded-full bg-gradient-to-r ${note.color || noteColors[0]} -mt-1 mb-4`} />
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-semibold text-surface-900 dark:text-surface-100 flex-1 truncate">{note.title}</h3>
+                  <button
+                    onClick={() => handleDeleteNote(note.id)}
+                    className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                  >
+                    <Trash2 size={14} className="text-red-400" />
+                  </button>
+                </div>
+                {note.location && (
+                  <p className="text-xs text-surface-400 flex items-center gap-1 mb-2">
+                    <MapPin size={12} /> {note.location}
+                  </p>
+                )}
+                <p className="text-sm text-surface-600 dark:text-surface-300 leading-relaxed line-clamp-4">
+                  {note.content}
+                </p>
+                <p className="text-xs text-surface-400 mt-3 flex items-center gap-1">
+                  <Calendar size={12} />
+                  {note.createdAt ? new Date(note.createdAt).toLocaleDateString() : 'Just now'}
+                </p>
+              </GlassCard>
+            </motion.div>
+          ))}
+        </StaggerContainer>
+      ) : (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center mx-auto mb-4">
+            <StickyNote size={28} className="text-surface-400" />
+          </div>
+          <p className="text-surface-500 dark:text-surface-400 mb-2">No notes yet</p>
+          <button onClick={() => setIsAdding(true)} className="text-primary-600 dark:text-primary-400 text-sm font-medium hover:underline">
+            Create your first note →
+          </button>
+        </div>
+      )}
+    </AnimatedPage>
   );
 }
 

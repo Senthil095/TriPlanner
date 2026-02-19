@@ -1,303 +1,337 @@
-// PlanGenerator Page - Form for generating itinerary
+// PlanGenerator Page - Multi-step trip planning form
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  MapPin, Calendar, Heart, DollarSign, Smile, User,
-  Shield, Loader2, Sparkles, ChevronRight
+import {
+  MapPin, Calendar, Heart, DollarSign, Sparkles, Users,
+  ChevronRight, ChevronLeft, Loader2, Globe, Compass,
+  Sun, Mountain, Building2, Utensils, Camera, Music, TreePine
 } from 'lucide-react';
-import { itineraryApi } from '../services/api';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTrip } from '../context/TripContext';
+import { itineraryApi } from '../services/api';
+import AnimatedPage from '../components/ui/AnimatedPage';
 
 const interests = [
   { id: 'culture', label: 'Culture', icon: '🏛️' },
   { id: 'food', label: 'Food', icon: '🍜' },
-  { id: 'adventure', label: 'Adventure', icon: '🏔️' },
+  { id: 'nature', label: 'Nature', icon: '🌿' },
+  { id: 'adventure', label: 'Adventure', icon: '🧗' },
+  { id: 'nightlife', label: 'Nightlife', icon: '🌙' },
   { id: 'shopping', label: 'Shopping', icon: '🛍️' },
-  { id: 'relaxation', label: 'Relaxation', icon: '🧘' },
+  { id: 'photography', label: 'Photography', icon: '📸' },
+  { id: 'wellness', label: 'Wellness', icon: '🧘' },
+  { id: 'history', label: 'History', icon: '📜' },
+  { id: 'art', label: 'Art', icon: '🎨' },
+  { id: 'sports', label: 'Sports', icon: '⚽' },
+  { id: 'music', label: 'Music', icon: '🎵' },
 ];
 
 const moods = [
-  { id: 'relaxed', label: 'Relaxed', description: 'Fewer places, more downtime', icon: '😌' },
-  { id: 'energetic', label: 'Energetic', description: 'Balanced pace, full days', icon: '⚡' },
-  { id: 'adventurous', label: 'Adventurous', description: 'Pack in the experiences!', icon: '🔥' },
+  { id: 'chill', label: 'Chill & Relax', emoji: '🧘', desc: 'Take it easy, no rush' },
+  { id: 'explorer', label: 'City Explorer', emoji: '🏙️', desc: 'See every corner' },
+  { id: 'adventure', label: 'Adventure Seeker', emoji: '🏔️', desc: 'Thrill and excitement' },
+  { id: 'culture', label: 'Culture Buff', emoji: '🎭', desc: 'Deep dive into local culture' },
+  { id: 'foodie', label: 'Foodie Journey', emoji: '🍽️', desc: 'Taste everything' },
+  { id: 'budget', label: 'Budget Explorer', emoji: '💰', desc: 'Max fun, min spend' },
 ];
 
-const personas = [
-  { id: 'budget_nomad', label: 'Budget Nomad', description: 'Maximize experiences, minimize costs' },
-  { id: 'culture_explorer', label: 'Culture Explorer', description: 'Deep dive into local culture' },
-  { id: 'digital_nomad', label: 'Digital Nomad', description: 'Balance work and exploration' },
-  { id: 'weekend_tripper', label: 'Weekend Tripper', description: 'Quick, impactful visits' },
-];
-
-const budgetRanges = [
-  { id: 'budget', label: 'Budget', description: '$50-100/day' },
-  { id: 'moderate', label: 'Moderate', description: '$100-200/day' },
-  { id: 'luxury', label: 'Luxury', description: '$200+/day' },
+const budgetOptions = [
+  { id: 'budget', label: 'Budget', range: '$50-100/day', color: 'from-emerald-400 to-teal-500' },
+  { id: 'moderate', label: 'Moderate', range: '$100-250/day', color: 'from-blue-400 to-indigo-500' },
+  { id: 'luxury', label: 'Luxury', range: '$250+/day', color: 'from-amber-400 to-orange-500' },
 ];
 
 function PlanGenerator() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { actions } = useTrip();
-  
+  const { dispatch } = useTrip();
+
+  const [step, setStep] = useState(1);
+  const [direction, setDirection] = useState(1);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState({
     destination: searchParams.get('destination') || '',
-    duration: 3,
+    days: 3,
     interests: [],
-    budget_range: 'moderate',
-    mood: 'energetic',
-    persona: 'culture_explorer',
-    safety_mode: false,
+    mood: '',
+    budget: 'moderate',
+    travelers: 'solo',
+    specialRequests: '',
   });
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
-  const handleInterestToggle = (interestId) => {
-    setFormData((prev) => ({
+
+  const updateField = (key, value) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleInterest = (id) => {
+    setFormData(prev => ({
       ...prev,
-      interests: prev.interests.includes(interestId)
-        ? prev.interests.filter((i) => i !== interestId)
-        : [...prev.interests, interestId],
+      interests: prev.interests.includes(id)
+        ? prev.interests.filter(i => i !== id)
+        : [...prev.interests, id],
     }));
   };
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.destination) {
-      setError('Please enter a destination');
-      return;
-    }
-    
-    if (formData.interests.length === 0) {
-      setError('Please select at least one interest');
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    
+
+  const nextStep = () => { setDirection(1); setStep(s => Math.min(s + 1, 3)); };
+  const prevStep = () => { setDirection(-1); setStep(s => Math.max(s - 1, 1)); };
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    dispatch({ type: 'SET_GENERATING', payload: true });
     try {
-      const itinerary = await itineraryApi.generate(formData);
-      
-      // Save to context and offline storage
-      await actions.saveTrip(itinerary);
-      actions.setCurrentTrip(itinerary);
-      
-      // Navigate to itinerary view
-      navigate('/itinerary', { state: { tripId: itinerary.trip_id } });
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to generate itinerary. Please try again.');
+      const response = await itineraryApi.generate({
+        city: formData.destination,
+        days: formData.days,
+        interests: formData.interests,
+        mood: formData.mood,
+        budget: formData.budget,
+        travelers: formData.travelers,
+        special_requests: formData.specialRequests,
+      });
+      dispatch({ type: 'SET_CURRENT_TRIP', payload: response.data });
+      navigate('/itinerary');
+    } catch (error) {
+      console.error('Generation failed:', error);
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
+      dispatch({ type: 'SET_GENERATING', payload: false });
     }
   };
-  
+
+  const slideVariants = {
+    enter: (dir) => ({ x: dir > 0 ? 250 : -250, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir) => ({ x: dir < 0 ? 250 : -250, opacity: 0 }),
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-3xl mx-auto px-4">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Plan Your Solo Adventure
-          </h1>
-          <p className="text-lg text-gray-600">
-            Tell us about your trip and we'll create the perfect itinerary
-          </p>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Destination */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <MapPin className="text-primary-500" size={24} />
-              Where are you going?
-            </label>
-            <input
-              type="text"
-              value={formData.destination}
-              onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-              placeholder="Enter city name (e.g., Paris, Tokyo, Bangkok)"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all text-lg"
-            />
-          </div>
-          
-          {/* Duration */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <Calendar className="text-primary-500" size={24} />
-              How many days?
-            </label>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="1"
-                max="14"
-                value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-500"
-              />
-              <span className="text-2xl font-bold text-primary-600 w-16 text-center">
-                {formData.duration} {formData.duration === 1 ? 'day' : 'days'}
-              </span>
-            </div>
-          </div>
-          
-          {/* Interests */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <Heart className="text-primary-500" size={24} />
-              What are your interests?
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {interests.map((interest) => (
-                <button
-                  key={interest.id}
-                  type="button"
-                  onClick={() => handleInterestToggle(interest.id)}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.interests.includes(interest.id)
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">{interest.icon}</div>
-                  <div className="text-sm font-medium text-gray-700">{interest.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Budget */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <DollarSign className="text-primary-500" size={24} />
-              What's your budget?
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {budgetRanges.map((budget) => (
-                <button
-                  key={budget.id}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, budget_range: budget.id })}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.budget_range === budget.id
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-semibold text-gray-900">{budget.label}</div>
-                  <div className="text-sm text-gray-500">{budget.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Mood */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <Smile className="text-primary-500" size={24} />
-              What's your travel mood?
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {moods.map((mood) => (
-                <button
-                  key={mood.id}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, mood: mood.id })}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.mood === mood.id
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">{mood.icon}</div>
-                  <div className="font-semibold text-gray-900">{mood.label}</div>
-                  <div className="text-xs text-gray-500">{mood.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Persona */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
-              <User className="text-primary-500" size={24} />
-              What type of traveler are you?
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {personas.map((persona) => (
-                <button
-                  key={persona.id}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, persona: persona.id })}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    formData.persona === persona.id
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-semibold text-gray-900">{persona.label}</div>
-                  <div className="text-sm text-gray-500">{persona.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Safety Mode */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Shield className="text-primary-500" size={24} />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Women Safety Mode</h3>
-                  <p className="text-sm text-gray-500">
-                    Prioritize safe areas and solo-friendly locations
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, safety_mode: !formData.safety_mode })}
-                className={`w-14 h-8 rounded-full transition-colors ${
-                  formData.safety_mode ? 'bg-primary-500' : 'bg-gray-200'
-                }`}
-              >
-                <div className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform ${
-                  formData.safety_mode ? 'translate-x-7' : 'translate-x-1'
-                }`} />
-              </button>
-            </div>
-          </div>
-          
-          {/* Error message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
-              {error}
-            </div>
-          )}
-          
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-4 px-6 bg-primary-500 text-white rounded-xl font-semibold text-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={24} className="animate-spin" />
-                Generating Your Perfect Itinerary...
-              </>
-            ) : (
-              <>
-                <Sparkles size={24} />
-                Generate My Itinerary
-                <ChevronRight size={20} />
-              </>
-            )}
-          </button>
-        </form>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-surface-950 dark:via-surface-900 dark:to-primary-950">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary-400/5 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-accent-400/5 blur-3xl" />
       </div>
+
+      <AnimatedPage className="relative max-w-2xl mx-auto px-4 py-8 pb-24">
+        {/* Header */}
+        <motion.div className="text-center mb-8" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary-500/20">
+            <Sparkles size={24} className="text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">Plan Your Trip</h1>
+          <p className="text-surface-500 dark:text-surface-400 mt-1 text-sm">AI will craft the perfect itinerary for you</p>
+        </motion.div>
+
+        {/* Progress */}
+        <div className="flex items-center justify-center gap-2 mb-8">
+          {[1, 2, 3].map(s => (
+            <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${s <= step ? 'w-12 bg-primary-500' : 'w-8 bg-surface-200 dark:bg-surface-700'
+              }`} />
+          ))}
+        </div>
+
+        {/* Form Card */}
+        <div className="glass-card p-6 sm:p-8 min-h-[400px]">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={step}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.25 }}
+            >
+              {/* Step 1: Destination & Duration */}
+              {step === 1 && (
+                <div className="space-y-6">
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+                    <MapPin size={20} className="text-primary-500" />
+                    Where & When
+                  </h2>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Destination</label>
+                    <div className="relative">
+                      <Globe size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400" />
+                      <input
+                        type="text"
+                        value={formData.destination}
+                        onChange={e => updateField('destination', e.target.value)}
+                        className="input-field pl-11"
+                        placeholder="e.g. Tokyo, Paris, Bangkok..."
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                      Duration: <span className="text-primary-600 dark:text-primary-400 font-bold">{formData.days} days</span>
+                    </label>
+                    <input
+                      type="range" min="1" max="14" value={formData.days}
+                      onChange={e => updateField('days', parseInt(e.target.value))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-surface-400 mt-1">
+                      <span>1 day</span><span>1 week</span><span>2 weeks</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Travelers</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { id: 'solo', label: 'Solo', emoji: '🧑' },
+                        { id: 'couple', label: 'Couple', emoji: '👫' },
+                        { id: 'group', label: 'Group', emoji: '👨‍👩‍👧‍👦' },
+                      ].map(t => (
+                        <button key={t.id} onClick={() => updateField('travelers', t.id)}
+                          className={`p-3 rounded-xl border-2 text-center transition-all ${formData.travelers === t.id
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
+                              : 'border-surface-200 dark:border-surface-700'
+                            }`}
+                        >
+                          <span className="text-2xl block">{t.emoji}</span>
+                          <span className="text-xs font-medium mt-1 block text-surface-700 dark:text-surface-300">{t.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Mood & Budget */}
+              {step === 2 && (
+                <div className="space-y-6">
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+                    <Heart size={20} className="text-pink-500" />
+                    Mood & Budget
+                  </h2>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Travel Mood</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {moods.map(m => (
+                        <motion.button key={m.id} whileTap={{ scale: 0.95 }}
+                          onClick={() => updateField('mood', m.id)}
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${formData.mood === m.id
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 shadow-sm'
+                              : 'border-surface-200 dark:border-surface-700'
+                            }`}
+                        >
+                          <span className="text-2xl">{m.emoji}</span>
+                          <div className="text-left">
+                            <p className="text-sm font-medium text-surface-900 dark:text-surface-100">{m.label}</p>
+                            <p className="text-xs text-surface-400">{m.desc}</p>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Budget Level</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {budgetOptions.map(b => (
+                        <button key={b.id} onClick={() => updateField('budget', b.id)}
+                          className={`p-4 rounded-xl border-2 text-center transition-all ${formData.budget === b.id
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
+                              : 'border-surface-200 dark:border-surface-700'
+                            }`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${b.color} flex items-center justify-center mx-auto mb-2`}>
+                            <DollarSign size={18} className="text-white" />
+                          </div>
+                          <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">{b.label}</p>
+                          <p className="text-xs text-surface-400 mt-0.5">{b.range}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Interests & Special Requests */}
+              {step === 3 && (
+                <div className="space-y-6">
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+                    <Compass size={20} className="text-blue-500" />
+                    Interests & Details
+                  </h2>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">
+                      Select your interests <span className="text-surface-400">(pick 3+)</span>
+                    </label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {interests.map(i => (
+                        <motion.button key={i.id} whileTap={{ scale: 0.92 }}
+                          onClick={() => toggleInterest(i.id)}
+                          className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${formData.interests.includes(i.id)
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
+                              : 'border-surface-200 dark:border-surface-700'
+                            }`}
+                        >
+                          <span className="text-xl">{i.icon}</span>
+                          <span className="text-xs font-medium text-surface-700 dark:text-surface-300">{i.label}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                      Special Requests <span className="text-surface-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={formData.specialRequests}
+                      onChange={e => updateField('specialRequests', e.target.value)}
+                      className="input-field min-h-[100px] resize-none"
+                      placeholder="Any dietary restrictions, mobility needs, must-see spots..."
+                      rows={4}
+                    />
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-6">
+          <button onClick={prevStep} disabled={step === 1}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-30"
+          >
+            <ChevronLeft size={18} />
+            Back
+          </button>
+
+          {step < 3 ? (
+            <button onClick={nextStep} disabled={step === 1 && !formData.destination.trim()}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50"
+            >
+              Next
+              <ChevronRight size={18} />
+            </button>
+          ) : (
+            <button onClick={handleGenerate} disabled={isGenerating || !formData.destination.trim()}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  Generate Itinerary
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </AnimatedPage>
     </div>
   );
 }
