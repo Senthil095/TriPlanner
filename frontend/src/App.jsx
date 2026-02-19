@@ -3,10 +3,13 @@ import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   Home as HomeIcon, Map, Shield, Star, StickyNote, 
-  MessageCircle, DollarSign, Menu, X, User
+  MessageCircle, DollarSign, Menu, X, User, LogOut
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTrip } from './context/TripContext';
+
+// Components
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import Home from './pages/Home';
@@ -17,6 +20,8 @@ import SafetyTips from './pages/SafetyTips';
 import HiddenGems from './pages/HiddenGems';
 import Notes from './pages/Notes';
 import Chatbot from './pages/Chatbot';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 
 const navItems = [
   { path: '/', label: 'Home', icon: HomeIcon },
@@ -30,10 +35,24 @@ const navItems = [
 function Navigation() {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { state } = useTrip();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = React.useRef(null);
+  const { state, actions } = useTrip();
   
-  // Don't show nav on itinerary view (has its own header)
-  if (location.pathname === '/itinerary') {
+  // Close user menu when clicking outside
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  // Don't show nav on auth pages or itinerary view
+  if (location.pathname === '/itinerary' || location.pathname === '/login' || location.pathname === '/signup') {
     return null;
   }
   
@@ -77,10 +96,47 @@ function Navigation() {
                  title={state.isOnline ? 'Online' : 'Offline'} />
             
             {state.isAuthenticated ? (
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                <User size={18} className="text-gray-600" />
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                    <User size={18} className="text-primary-600" />
+                  </div>
+                  <span className="hidden sm:block text-sm font-medium text-gray-700">
+                    {state.user?.email?.split('@')[0] || 'User'}
+                  </span>
+                </button>
+                
+                {/* User dropdown menu */}
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-900">{state.user?.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        actions.logout();
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : null}
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+              >
+                <User size={18} />
+                Sign In
+              </Link>
+            )}
             
             {/* Mobile menu button */}
             <button
@@ -127,14 +183,39 @@ function App() {
       <Navigation />
       
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Home />} />
-        <Route path="/plan" element={<PlanGenerator />} />
-        <Route path="/itinerary" element={<ItineraryView />} />
-        <Route path="/budget" element={<BudgetView />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        
+        {/* Protected Routes */}
+        <Route path="/plan" element={
+          <ProtectedRoute>
+            <PlanGenerator />
+          </ProtectedRoute>
+        } />
+        <Route path="/itinerary" element={
+          <ProtectedRoute>
+            <ItineraryView />
+          </ProtectedRoute>
+        } />
+        <Route path="/budget" element={
+          <ProtectedRoute>
+            <BudgetView />
+          </ProtectedRoute>
+        } />
         <Route path="/safety" element={<SafetyTips />} />
         <Route path="/hidden-gems" element={<HiddenGems />} />
-        <Route path="/notes" element={<Notes />} />
-        <Route path="/chatbot" element={<Chatbot />} />
+        <Route path="/notes" element={
+          <ProtectedRoute>
+            <Notes />
+          </ProtectedRoute>
+        } />
+        <Route path="/chatbot" element={
+          <ProtectedRoute>
+            <Chatbot />
+          </ProtectedRoute>
+        } />
       </Routes>
     </div>
   );

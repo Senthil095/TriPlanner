@@ -1,7 +1,7 @@
 // Trip Context - Global State Management
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { offlineTrips, offlineNotes, isOnline, setupOfflineListeners } from '../services/offlineStorage';
-import { auth } from '../services/firebase';
+import { auth, logoutUser } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
 // Initial state
@@ -240,8 +240,13 @@ export function TripProvider({ children }) {
       dispatch({ type: ActionTypes.CLEAR_ERROR });
     },
     
-    logout: () => {
-      dispatch({ type: ActionTypes.LOGOUT });
+    logout: async () => {
+      try {
+        await logoutUser();
+        dispatch({ type: ActionTypes.LOGOUT });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
     },
   };
   
