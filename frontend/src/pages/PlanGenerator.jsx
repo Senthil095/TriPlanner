@@ -26,6 +26,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTrip } from "../context/TripContext";
 import { itineraryApi, plansApi } from "../services/api";
 import AnimatedPage from "../components/ui/AnimatedPage";
+import RouteVisualizer from "../components/RouteVisualizer";
+import { mapService } from "../services/mapService";
 
 const interests = [
   { id: "culture", label: "Culture", icon: "🏛️" },
@@ -123,6 +125,17 @@ function PlanGenerator() {
   });
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
 
+  // Route Preview State
+  const [showPreview, setShowPreview] = useState(false);
+  const [routeData, setRouteData] = useState({
+    startCoords: null,
+    endCoords: null,
+    route: null,
+    comparisons: []
+  });
+  const [isRouting, setIsRouting] = useState(false);
+  const [routeError, setRouteError] = useState(null);
+
   const updateField = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
@@ -136,7 +149,45 @@ function PlanGenerator() {
     }));
   };
 
+  const handlePreview = async () => {
+    if (!formData.origin || !formData.destination) {
+      return;
+    }
+
+    setIsRouting(true);
+    setRouteError(null);
+    setShowPreview(true);
+
+    try {
+      const [start, end] = await Promise.all([
+        mapService.getCoordinates(formData.origin),
+        mapService.getCoordinates(formData.destination)
+      ]);
+
+      const route = await mapService.getRoute(start, end);
+      const comparisons = mapService.calculateComparisons(route.distance, route.duration);
+
+      setRouteData({
+        startCoords: start,
+        endCoords: end,
+        route: route,
+        comparisons: comparisons
+      });
+
+    } catch (error) {
+      console.error("Preview failed:", error);
+      setRouteError(error.message || "Failed to calculate route. Please check the city names.");
+    } finally {
+      setIsRouting(false);
+    }
+  };
+
   const nextStep = () => {
+    // Auto-trigger preview when moving from Step 1 (Destination/Origin)
+    if (step === 1 && formData.origin && formData.destination) {
+      handlePreview();
+    }
+
     setDirection(1);
     setStep((s) => Math.min(s + 1, 3));
   };
@@ -162,7 +213,6 @@ function PlanGenerator() {
       });
       dispatch({ type: "SET_CURRENT_TRIP", payload: response });
 
-      // Auto-save the generated itinerary (non-blocking)
       setSaveStatus("saving");
       plansApi
         .save({
@@ -222,11 +272,10 @@ function PlanGenerator() {
           {[1, 2, 3].map((s) => (
             <div
               key={s}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                s <= step
-                  ? "w-12 bg-primary-500"
-                  : "w-8 bg-surface-200 dark:bg-surface-700"
-              }`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${s <= step
+                ? "w-12 bg-primary-500"
+                : "w-8 bg-surface-200 dark:bg-surface-700"
+                }`}
             />
           ))}
         </div>
@@ -293,11 +342,24 @@ function PlanGenerator() {
                       />
                     </div>
                     {formData.origin && (
-                      <p className="text-xs text-primary-500 mt-1.5 flex items-center gap-1">
-                        <Sparkles size={11} />
-                        AI will estimate flights, visa &amp; insurance from{" "}
-                        {formData.origin}
-                      </p>
+                      <div className="mt-1.5">
+                        <p className="text-xs text-primary-500 flex items-center gap-1">
+                          <Sparkles size={11} />
+                          AI will estimate flights, visa &amp; insurance from{" "}
+                          {formData.origin}
+                        </p>
+
+                        {/* Preview Button for Step 1 */}
+                        {formData.destination && (
+                          <button
+                            onClick={handlePreview}
+                            className="mt-2 text-sm text-primary-600 dark:text-primary-400 font-medium hover:underline flex items-center gap-1"
+                          >
+                            <MapPin size={14} />
+                            Preview Route & Travel Costs
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -338,11 +400,10 @@ function PlanGenerator() {
                         <button
                           key={t.id}
                           onClick={() => updateField("travelers", t.id)}
-                          className={`p-3 rounded-xl border-2 text-center transition-all ${
-                            formData.travelers === t.id
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
-                              : "border-surface-200 dark:border-surface-700"
-                          }`}
+                          className={`p-3 rounded-xl border-2 text-center transition-all ${formData.travelers === t.id
+                            ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
+                            : "border-surface-200 dark:border-surface-700"
+                            }`}
                         >
                           <span className="text-2xl block">{t.emoji}</span>
                           <span className="text-xs font-medium mt-1 block text-surface-700 dark:text-surface-300">
@@ -373,11 +434,10 @@ function PlanGenerator() {
                           key={m.id}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => updateField("mood", m.id)}
-                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                            formData.mood === m.id
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10 shadow-sm"
-                              : "border-surface-200 dark:border-surface-700"
-                          }`}
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${formData.mood === m.id
+                            ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10 shadow-sm"
+                            : "border-surface-200 dark:border-surface-700"
+                            }`}
                         >
                           <span className="text-2xl">{m.emoji}</span>
                           <div className="text-left">
@@ -400,11 +460,10 @@ function PlanGenerator() {
                         <button
                           key={b.id}
                           onClick={() => updateField("budget", b.id)}
-                          className={`p-4 rounded-xl border-2 text-center transition-all ${
-                            formData.budget === b.id
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
-                              : "border-surface-200 dark:border-surface-700"
-                          }`}
+                          className={`p-4 rounded-xl border-2 text-center transition-all ${formData.budget === b.id
+                            ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
+                            : "border-surface-200 dark:border-surface-700"
+                            }`}
                         >
                           <div
                             className={`w-10 h-10 rounded-xl bg-gradient-to-br ${b.color} flex items-center justify-center mx-auto mb-2`}
@@ -443,11 +502,10 @@ function PlanGenerator() {
                           key={i.id}
                           whileTap={{ scale: 0.92 }}
                           onClick={() => toggleInterest(i.id)}
-                          className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-                            formData.interests.includes(i.id)
-                              ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
-                              : "border-surface-200 dark:border-surface-700"
-                          }`}
+                          className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${formData.interests.includes(i.id)
+                            ? "border-primary-500 bg-primary-50 dark:bg-primary-500/10"
+                            : "border-surface-200 dark:border-surface-700"
+                            }`}
                         >
                           <span className="text-xl">{i.icon}</span>
                           <span className="text-xs font-medium text-surface-700 dark:text-surface-300">
@@ -519,6 +577,38 @@ function PlanGenerator() {
             </button>
           )}
         </div>
+
+        {/* Route Visualization Area */}
+        {showPreview && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-8"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+                <MapPin className="text-primary-500" />
+                Journey Preview
+              </h2>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="text-sm text-surface-500 hover:text-red-500"
+              >
+                Close Preview
+              </button>
+            </div>
+
+            <RouteVisualizer
+              startCoords={routeData.startCoords}
+              endCoords={routeData.endCoords}
+              routeData={routeData.route}
+              comparisons={routeData.comparisons}
+              isLoading={isRouting}
+              error={routeError}
+            />
+          </motion.div>
+        )}
+
       </AnimatedPage>
     </div>
   );
