@@ -16,6 +16,39 @@ from app.services.firebase_service import FirebaseService
 router = APIRouter(prefix="/api", tags=["guides"])
 
 
+@router.get("/guides/cities", response_model=List[str])
+async def get_available_cities():
+    """
+    Get list of cities with registered guides.
+    """
+    try:
+        firebase_service = FirebaseService()
+        meta = await firebase_service.get_meta("guides")
+        
+        if meta and "available_cities" in meta:
+            return meta["available_cities"]
+            
+        # Fallback to static list if DB fetch fails or is empty
+        return [
+            "Paris",
+            "Tokyo",
+            "Bangkok",
+            "Rome",
+            "Barcelona",
+            "New York",
+            "London",
+            "Sydney",
+            "Dubai",
+            "Singapore"
+        ]
+    except Exception:
+        # Fallback on error
+        return [
+            "Paris", "Tokyo", "Bangkok", "Rome", "Barcelona", 
+            "New York", "London", "Sydney", "Dubai", "Singapore"
+        ]
+
+
 @router.get("/guides/{city}", response_model=List[Dict[str, Any]])
 async def get_guides_by_city(city: str):
     """
@@ -93,21 +126,4 @@ async def get_guide_profile(guide_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/guides/cities", response_model=List[str])
-async def get_available_cities():
-    """
-    Get list of cities with registered guides.
-    """
-    # For now, return a static list. Can be made dynamic with Firebase query
-    return [
-        "Paris",
-        "Tokyo",
-        "Bangkok",
-        "Rome",
-        "Barcelona",
-        "New York",
-        "London",
-        "Sydney",
-        "Dubai",
-        "Singapore"
-    ]
+

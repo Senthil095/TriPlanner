@@ -10,6 +10,7 @@ Provides:
 
 from typing import Dict, List, Any, Optional
 from datetime import datetime, time
+from app.services.firebase_service import FirebaseService
 
 
 class SafetyService:
@@ -141,11 +142,16 @@ class SafetyService:
     }
     
     @staticmethod
-    def get_city_safety_info(city: str) -> Dict[str, Any]:
+    async def get_city_safety_info(city: str) -> Dict[str, Any]:
         """Get safety information for a city"""
         city_lower = city.lower().strip()
         
-        # Check if we have specific data for this city
+        # Try to get from database first
+        db_info = await FirebaseService.get_safety_info(city_lower)
+        if db_info:
+            return db_info
+            
+        # Check if we have specific data for this city in static fallback
         if city_lower in SafetyService.CITY_SAFETY_DATA:
             return SafetyService.CITY_SAFETY_DATA[city_lower]
         
@@ -198,6 +204,7 @@ class SafetyService:
         safety_mode: bool = False
     ) -> List[str]:
         """Get specific safety tips for a place"""
+        # ... implementation remains sync as it doesn't need DB ...
         tips = []
         category = place.get("category", "").lower()
         
@@ -241,7 +248,7 @@ class SafetyService:
         return tips[:5]  # Return top 5 tips
     
     @staticmethod
-    def is_place_safe_at_time(
+    async def is_place_safe_at_time(
         place: Dict[str, Any],
         visit_time: str,
         city: str,
@@ -255,7 +262,8 @@ class SafetyService:
             hour = 12
         
         is_night = hour < 6 or hour > 21
-        city_data = SafetyService.get_city_safety_info(city)
+        # await the async call
+        city_data = await SafetyService.get_city_safety_info(city)
         place_name = place.get("name", "").lower()
         
         # Check if place is in areas to avoid at night
@@ -304,7 +312,7 @@ class SafetyService:
         return result
     
     @staticmethod
-    def filter_safe_places(
+    async def filter_safe_places(
         places: List[Dict[str, Any]],
         city: str,
         safety_mode: bool = False,
@@ -318,7 +326,8 @@ class SafetyService:
             if isinstance(visit_time, str) and " - " in visit_time:
                 visit_time = visit_time.split(" - ")[0]
             
-            safety_check = SafetyService.is_place_safe_at_time(
+            # await the async call
+            safety_check = await SafetyService.is_place_safe_at_time(
                 place, visit_time, city, safety_mode
             )
             
@@ -343,9 +352,10 @@ class SafetyService:
         return filtered
     
     @staticmethod
-    def get_emergency_contacts(city: str) -> Dict[str, str]:
+    async def get_emergency_contacts(city: str) -> Dict[str, str]:
         """Get emergency contact numbers for a city"""
-        city_data = SafetyService.get_city_safety_info(city)
+        # await the async call
+        city_data = await SafetyService.get_city_safety_info(city)
         return city_data.get("emergency_numbers", {
             "police": "911",
             "ambulance": "911"

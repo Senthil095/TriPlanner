@@ -33,14 +33,14 @@ class BudgetRange(str, Enum):
 
 # Request Models
 class ItineraryRequest(BaseModel):
-    destination: str = Field(..., description="Destination city")
-    duration: int = Field(..., ge=1, le=30, description="Trip duration in days")
-    interests: List[InterestType] = Field(..., description="User interests")
-    budget_range: BudgetRange = Field(..., description="Budget range")
-    mood: MoodType = Field(..., description="Travel mood")
-    persona: TravelPersona = Field(..., description="Travel persona")
-    safety_mode: bool = Field(default=False, description="Enable women safety mode")
-    start_date: Optional[str] = Field(None, description="Trip start date")
+    city: str = Field(..., description="Destination city")
+    days: int = Field(..., ge=1, le=30, description="Trip duration in days")
+    interests: List[str] = Field(..., description="User interests")
+    budget: str = Field(..., description="Budget range")
+    mood: str = Field(..., description="Travel mood")
+    travelers: str = Field(..., description="Group size / type")
+    special_requests: Optional[str] = Field(None, description="Special requests")
+    origin: Optional[str] = Field(None, description="Origin city/country for flight & visa estimation")
 
 
 class ReplanRequest(BaseModel):
@@ -127,6 +127,10 @@ class BudgetBreakdown(BaseModel):
     transport: float
     activities: float
     miscellaneous: float
+    flights: Optional[float] = Field(0.0, description="Round-trip flight cost estimate from origin")
+    visa: Optional[float] = Field(0.0, description="Visa fee estimate for origin -> destination")
+    insurance: Optional[float] = Field(0.0, description="Recommended travel insurance estimate")
+    currency_note: Optional[str] = Field(None, description="Currency exchange tip and approximate rate")
     total: float
     budget_tips: List[str] = []
     trade_offs: List[Dict[str, Any]] = []

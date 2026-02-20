@@ -1,42 +1,54 @@
 // ChatWidget Component - Floating chat button and quick actions
-import React, { useState } from 'react';
-import { MessageCircle, X, Send, Navigation, CloudRain, Edit, DollarSign, Shield, Utensils } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import {
+  MessageCircle,
+  X,
+  Send,
+  Navigation,
+  CloudRain,
+  Edit,
+  DollarSign,
+  Shield,
+  Utensils,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const quickActions = [
-  { id: 'whats_next', label: "What's next?", icon: Navigation },
-  { id: 'weather_backup', label: 'Weather backup', icon: CloudRain },
-  { id: 'change_plan', label: 'Change plan', icon: Edit },
-  { id: 'budget_check', label: 'Budget check', icon: DollarSign },
-  { id: 'safety_tips', label: 'Safety tips', icon: Shield },
-  { id: 'local_food', label: 'Local food', icon: Utensils },
+  { id: "whats_next", label: "What's next?", icon: Navigation },
+  { id: "weather_backup", label: "Weather backup", icon: CloudRain },
+  { id: "change_plan", label: "Change plan", icon: Edit },
+  { id: "budget_check", label: "Budget check", icon: DollarSign },
+  { id: "safety_tips", label: "Safety tips", icon: Shield },
+  { id: "local_food", label: "Local food", icon: Utensils },
 ];
 
 function ChatWidget({ tripId, onQuickAction }) {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
-  
+
   const handleQuickAction = (actionId) => {
     if (onQuickAction) {
       onQuickAction(actionId);
     }
     setIsOpen(false);
   };
-  
+
   const handleOpenChat = () => {
-    navigate('/chatbot', { state: { tripId } });
+    navigate("/chatbot", { state: { tripId } });
   };
-  
+
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 left-4 sm:left-6 z-50">
       {/* Quick actions panel */}
       {isOpen && (
-        <div className="absolute bottom-16 right-0 w-72 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden mb-2 animate-in slide-in-from-bottom-4">
+        <div className="absolute bottom-16 left-0 w-72 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden mb-2 animate-in slide-in-from-bottom-4">
           <div className="p-4 border-b border-gray-100">
             <h3 className="font-semibold text-gray-900">Quick Actions</h3>
-            <p className="text-sm text-gray-500">Get instant help with your trip</p>
+            <p className="text-sm text-gray-500">
+              Get instant help with your trip
+            </p>
           </div>
-          
+
           <div className="p-2 grid grid-cols-2 gap-2">
             {quickActions.map((action) => {
               const Icon = action.icon;
@@ -52,7 +64,7 @@ function ChatWidget({ tripId, onQuickAction }) {
               );
             })}
           </div>
-          
+
           <div className="p-3 border-t border-gray-100">
             <button
               onClick={handleOpenChat}
@@ -64,15 +76,17 @@ function ChatWidget({ tripId, onQuickAction }) {
           </div>
         </div>
       )}
-      
+
       {/* Floating button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-105 ${
-          isOpen 
-            ? 'bg-gray-600 text-white rotate-90' 
-            : 'bg-primary-500 text-white'
+          isOpen
+            ? "bg-gray-600 text-white rotate-90"
+            : "bg-primary-500 text-white"
         }`}
+        title="Trip Assistant"
+        aria-label="Trip Assistant"
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
       </button>

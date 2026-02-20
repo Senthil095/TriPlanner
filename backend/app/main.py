@@ -10,7 +10,8 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.services.firebase_service import init_firebase
-from app.routes import itinerary, plans, guides, hidden_gems, chatbot
+from app.routes import itinerary, plans, guides, hidden_gems, chatbot, meta
+from app.routes import user, emergency
 
 settings = get_settings()
 
@@ -31,7 +32,7 @@ app = FastAPI(
     title=settings.app_name,
     description="""
     AI-powered travel planning for solo travelers.
-    
+
     Features:
     - Personalized itinerary generation
     - Safety-aware recommendations
@@ -61,6 +62,9 @@ app.include_router(plans.router)
 app.include_router(guides.router)
 app.include_router(hidden_gems.router)
 app.include_router(chatbot.router)
+app.include_router(meta.router)
+app.include_router(user.router)
+app.include_router(emergency.router)
 
 
 @app.get("/")
@@ -75,7 +79,9 @@ async def root():
             "plans": "/api/save-plan",
             "guides": "/api/guides/{city}",
             "hidden_gems": "/api/hidden-gems/{city}",
-            "chat": "/api/chat"
+            "chat": "/api/chat",
+            "user_profile": "/api/user/profile/{user_id}",
+            "emergency_sos": "/api/emergency/trigger-sos",
         }
     }
 

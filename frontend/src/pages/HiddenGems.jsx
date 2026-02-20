@@ -6,24 +6,39 @@ import { hiddenGemsApi } from '../services/api';
 import AnimatedPage, { StaggerContainer, staggerItem } from '../components/ui/AnimatedPage';
 import GlassCard from '../components/ui/GlassCard';
 
-const categories = ['All', 'Cafés', 'Viewpoints', 'Streets', 'Beaches', 'Markets', 'Parks', 'Temples'];
-
-const demoGems = [
-  { id: 1, name: 'Moonlight Terrace', category: 'Viewpoints', location: 'Santorini, Greece', rating: 4.9, likes: 342, description: 'Secret sunset spot with panoramic caldera views, away from the tourist crowds.' },
-  { id: 2, name: 'Café Sakura', category: 'Cafés', location: 'Kyoto, Japan', rating: 4.8, likes: 287, description: 'Hidden garden café in a restored machiya, serving matcha from a local farm.' },
-  { id: 3, name: 'Night Bazaar Alley', category: 'Markets', location: 'Bangkok, Thailand', rating: 4.7, likes: 456, description: 'Locals-only night market with incredible street food and vintage finds.' },
-  { id: 4, name: 'Emerald Pool', category: 'Beaches', location: 'Krabi, Thailand', rating: 4.9, likes: 523, description: 'Crystal-clear natural pool tucked inside a tropical forest, zero tourists.' },
-  { id: 5, name: 'Artist Loop', category: 'Streets', location: 'Barcelona, Spain', rating: 4.6, likes: 198, description: 'Winding street with stunning murals and hidden gallery doors.' },
-  { id: 6, name: 'Zen Garden Retreat', category: 'Parks', location: 'Tokyo, Japan', rating: 4.8, likes: 312, description: 'Tiny zen garden behind a residential area — the most peaceful spot in Shinjuku.' },
-];
+// Demo gems removed - fetching from API
+const demoGems = [];
 
 function HiddenGems() {
-  const [gems, setGems] = useState(demoGems);
+  const [gems, setGems] = useState([]);
+  const [categories, setCategories] = useState(['All']);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [showSubmit, setShowSubmit] = useState(false);
   const [likedGems, setLikedGems] = useState(new Set());
+
+  // Fetch data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [cats, featured] = await Promise.all([
+          hiddenGemsApi.getCategories(),
+          hiddenGemsApi.getFeatured()
+        ]);
+
+        // Capitalize categories for display matching
+        const formattedCats = ['All', ...cats.map(c => c.charAt(0).toUpperCase() + c.slice(1))];
+        setCategories(formattedCats);
+        setGems(featured);
+      } catch (err) {
+        console.error("Failed to fetch gems data", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   // Submission form state
   const [newGem, setNewGem] = useState({
@@ -31,8 +46,10 @@ function HiddenGems() {
   });
 
   const filteredGems = gems.filter(g => {
+    // Handle case where location might be missing in API response (use city instead if needed)
+    const loc = g.location || g.city || '';
     const matchesSearch = g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.location.toLowerCase().includes(searchQuery.toLowerCase());
+      loc.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'All' || g.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
@@ -84,8 +101,8 @@ function HiddenGems() {
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
               className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${activeCategory === cat
-                  ? 'bg-primary-500 text-white shadow-md'
-                  : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+                ? 'bg-primary-500 text-white shadow-md'
+                : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
                 }`}
             >
               {cat}
@@ -145,7 +162,7 @@ function HiddenGems() {
               <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-1">{gem.name}</h3>
               <p className="text-sm text-surface-500 dark:text-surface-400 flex items-center gap-1 mb-3">
                 <MapPin size={14} />
-                {gem.location}
+                {gem.location || gem.city}
               </p>
               <p className="text-sm text-surface-600 dark:text-surface-300 leading-relaxed mb-4">{gem.description}</p>
 
@@ -156,7 +173,7 @@ function HiddenGems() {
                 </div>
                 <span className="text-xs text-surface-400 flex items-center gap-1">
                   <Heart size={12} />
-                  {gem.likes + (likedGems.has(gem.id) ? 1 : 0)} likes
+                  {(gem.likes || 0) + (likedGems.has(gem.id) ? 1 : 0)} likes
                 </span>
               </div>
             </GlassCard>

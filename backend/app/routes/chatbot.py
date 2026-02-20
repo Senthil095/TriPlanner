@@ -2,14 +2,14 @@
 Chatbot API Routes
 
 Endpoints:
-- POST /api/chat: Send message to travel assistant
+- POST /api/chat: Send message to travel assistant (Groq)
 """
 
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 
 from app.models.schemas import ChatRequest, ChatResponse
-from app.services.claude_service import get_claude_service
+from app.services.groq_service import get_groq_service
 from app.services.firebase_service import FirebaseService
 
 router = APIRouter(prefix="/api", tags=["chatbot"])
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api", tags=["chatbot"])
 @router.post("/chat", response_model=Dict[str, Any])
 async def chat(request: ChatRequest):
     """
-    Chat with the AI travel assistant.
+    Chat with the AI travel assistant powered by Groq.
     
     The assistant can:
     - Answer questions about the trip
@@ -32,7 +32,7 @@ async def chat(request: ChatRequest):
     - Conversation history
     """
     try:
-        claude_service = get_claude_service()
+        groq_service = get_groq_service()
         firebase_service = FirebaseService()
         
         # Get trip context if provided
@@ -42,8 +42,8 @@ async def chat(request: ChatRequest):
             if trip:
                 itinerary_context = trip.get("itinerary", {})
         
-        # Get AI response
-        response = await claude_service.chat(
+        # Get AI response from Groq
+        response = await groq_service.chat(
             message=request.message,
             conversation_history=request.conversation_history,
             itinerary_context=itinerary_context
@@ -58,7 +58,7 @@ async def chat(request: ChatRequest):
 @router.post("/chat/quick-action", response_model=Dict[str, Any])
 async def quick_action(action: str, trip_id: str):
     """
-    Handle predefined quick actions.
+    Handle predefined quick actions using Groq.
     
     Supported actions:
     - whats_next: Get the next place in the itinerary
@@ -68,7 +68,7 @@ async def quick_action(action: str, trip_id: str):
     """
     try:
         firebase_service = FirebaseService()
-        claude_service = get_claude_service()
+        groq_service = get_groq_service()
         
         trip = await firebase_service.get_trip(trip_id)
         if not trip:
@@ -87,7 +87,7 @@ async def quick_action(action: str, trip_id: str):
         
         prompt = action_prompts.get(action, f"Help me with: {action}")
         
-        response = await claude_service.chat(
+        response = await groq_service.chat(
             message=prompt,
             conversation_history=[],
             itinerary_context=itinerary

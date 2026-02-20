@@ -4,7 +4,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Home as HomeIcon, Map, Shield, Star, StickyNote,
-  MessageCircle, DollarSign, Menu, X, User, LogOut, Compass
+  MessageCircle, DollarSign, Menu, X, User, LogOut, Compass, Calculator
 } from 'lucide-react';
 import { useTrip } from './context/TripContext';
 import { useTheme } from './context/ThemeContext';
@@ -20,6 +20,7 @@ const Home = lazy(() => import('./pages/Home'));
 const PlanGenerator = lazy(() => import('./pages/PlanGenerator'));
 const ItineraryView = lazy(() => import('./pages/ItineraryView'));
 const BudgetView = lazy(() => import('./pages/BudgetView'));
+const BudgetCalculator = lazy(() => import('./pages/BudgetCalculator'));
 const SafetyTips = lazy(() => import('./pages/SafetyTips'));
 const HiddenGems = lazy(() => import('./pages/HiddenGems'));
 const Notes = lazy(() => import('./pages/Notes'));
@@ -44,6 +45,7 @@ const navItems = [
   { path: '/', label: 'Home', icon: HomeIcon },
   { path: '/dashboard', label: 'Dashboard', icon: Compass },
   { path: '/plan', label: 'Plan Trip', icon: Map },
+  { path: '/budget-calculator', label: 'Budget Calculator', icon: Calculator },
   { path: '/safety', label: 'Safety', icon: Shield },
   { path: '/hidden-gems', label: 'Hidden Gems', icon: Star },
   { path: '/notes', label: 'Notes', icon: StickyNote },
@@ -270,6 +272,9 @@ function App() {
             } />
             <Route path="/budget" element={
               <ProtectedRoute><BudgetView /></ProtectedRoute>
+            } />
+            <Route path="/budget-calculator" element={
+              <ProtectedRoute><BudgetCalculator /></ProtectedRoute>
             } />
             <Route path="/safety" element={<SafetyTips />} />
             <Route path="/hidden-gems" element={<HiddenGems />} />

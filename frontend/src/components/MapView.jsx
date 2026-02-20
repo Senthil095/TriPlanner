@@ -1,167 +1,106 @@
-// MapView Component - Google Maps integration with route polyline
-import React, { useState, useCallback, useEffect } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow } from '@react-google-maps/api';
+// MapView Component - Leaflet and Geoapify integration with route polyline
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { MapPin } from 'lucide-react';
 
-const containerStyle = {
-  width: '100%',
-  height: '100%',
-};
+// Fix Leaflet's default icon path issues
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
-const defaultCenter = {
-  lat: 48.8566,
-  lng: 2.3522,
-};
+const defaultCenter = [48.8566, 2.3522];
+const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY || '4d5816d856ed45c295789e4e00fb8509';
 
-const mapOptions = {
-  disableDefaultUI: false,
-  zoomControl: true,
-  streetViewControl: false,
-  mapTypeControl: false,
-  fullscreenControl: true,
-  styles: [
-    {
-      featureType: 'poi',
-      elementType: 'labels',
-      stylers: [{ visibility: 'off' }],
-    },
-  ],
-};
+// A component to handle map bounds when places change
+function ChangeView({ places }) {
+  const map = useMap();
+  useEffect(() => {
+    if (places && places.length > 0) {
+      const validPlaces = places.filter(p => p.location && p.location.lat && p.location.lng);
+      if (validPlaces.length > 0) {
+        const bounds = L.latLngBounds(validPlaces.map(p => [p.location.lat, p.location.lng]));
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+  }, [places, map]);
+  return null;
+}
 
 function MapView({ places = [], center, onPlaceSelect, selectedDay }) {
-  const [map, setMap] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
-  
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-  });
-  
-  // Calculate bounds to fit all markers
-  useEffect(() => {
-    if (map && places.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      places.forEach((place) => {
-        if (place.location) {
-          bounds.extend({
-            lat: place.location.lat,
-            lng: place.location.lng,
-          });
-        }
-      });
-      map.fitBounds(bounds, { padding: 50 });
-    }
-  }, [map, places]);
-  
-  const onLoad = useCallback((map) => {
-    setMap(map);
-  }, []);
-  
-  const onUnmount = useCallback(() => {
-    setMap(null);
-  }, []);
-  
+
   // Create path for polyline
   const routePath = places
-    .filter((p) => p.location)
-    .map((p) => ({
-      lat: p.location.lat,
-      lng: p.location.lng,
-    }));
-  
+    .filter((p) => p.location && p.location.lat && p.location.lng)
+    .map((p) => [p.location.lat, p.location.lng]);
+
   // Calculate center from places or use default
-  const mapCenter = center || (places.length > 0 && places[0].location
-    ? { lat: places[0].location.lat, lng: places[0].location.lng }
-    : defaultCenter);
-  
-  if (loadError) {
-    return (
-      <div className="w-full h-full bg-gray-100 rounded-xl flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <MapPin size={48} className="mx-auto mb-2 opacity-50" />
-          <p>Unable to load map</p>
-          <p className="text-sm">Please check your API key</p>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!isLoaded) {
-    return (
-      <div className="w-full h-full bg-gray-100 rounded-xl flex items-center justify-center animate-pulse">
-        <div className="text-center text-gray-400">
-          <MapPin size={48} className="mx-auto mb-2 animate-bounce" />
-          <p>Loading map...</p>
-        </div>
-      </div>
-    );
-  }
-  
+  const mapCenter = center
+    ? [center.lat, center.lng]
+    : (places.length > 0 && places[0].location
+      ? [places[0].location.lat, places[0].location.lng]
+      : defaultCenter);
+
   return (
-    <div className="w-full h-full rounded-xl overflow-hidden shadow-lg">
-      <GoogleMap
-        mapContainerStyle={containerStyle}
+    <div className="w-full h-full rounded-xl overflow-hidden shadow-lg relative z-0">
+      <MapContainer
         center={mapCenter}
         zoom={13}
-        onLoad={onLoad}
-        onUnmount={onUnmount}
-        options={mapOptions}
+        style={{ width: '100%', height: '100%' }}
+        zoomControl={true}
       >
+        <ChangeView places={places} />
+
+        <TileLayer
+          attribution='&copy; <a href="https://www.geoapify.com/">Geoapify</a> | &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url={`https://maps.geoapify.com/v1/tile/osm-liberty/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`}
+        />
+
         {/* Route polyline */}
         {routePath.length > 1 && (
           <Polyline
-            path={routePath}
-            options={{
-              strokeColor: '#0ea5e9',
-              strokeOpacity: 0.8,
-              strokeWeight: 4,
-              geodesic: true,
+            positions={routePath}
+            pathOptions={{
+              color: '#0ea5e9',
+              opacity: 0.8,
+              weight: 4,
             }}
           />
         )}
-        
+
         {/* Place markers */}
         {places.map((place, index) => (
-          place.location && (
+          place.location && place.location.lat && place.location.lng && (
             <Marker
               key={place.id || index}
-              position={{
-                lat: place.location.lat,
-                lng: place.location.lng,
+              position={[place.location.lat, place.location.lng]}
+              eventHandlers={{
+                click: () => {
+                  setSelectedPlace(place);
+                  onPlaceSelect?.(place);
+                },
               }}
-              label={{
-                text: String(index + 1),
-                color: 'white',
-                fontWeight: 'bold',
-              }}
-              onClick={() => {
-                setSelectedPlace(place);
-                onPlaceSelect?.(place);
-              }}
-            />
+            >
+              <Popup onClose={() => setSelectedPlace(null)}>
+                <div className="p-1 max-w-xs">
+                  <h3 className="font-semibold text-gray-900">{place.name}</h3>
+                  <p className="text-sm text-gray-600 mt-1">{place.description}</p>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                    <span>{place.recommended_time}</span>
+                    <span>•</span>
+                    <span>${place.cost_estimate}</span>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
           )
         ))}
-        
-        {/* Info window for selected place */}
-        {selectedPlace && selectedPlace.location && (
-          <InfoWindow
-            position={{
-              lat: selectedPlace.location.lat,
-              lng: selectedPlace.location.lng,
-            }}
-            onCloseClick={() => setSelectedPlace(null)}
-          >
-            <div className="p-2 max-w-xs">
-              <h3 className="font-semibold text-gray-900">{selectedPlace.name}</h3>
-              <p className="text-sm text-gray-600 mt-1">{selectedPlace.description}</p>
-              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                <span>{selectedPlace.recommended_time}</span>
-                <span>•</span>
-                <span>${selectedPlace.cost_estimate}</span>
-              </div>
-            </div>
-          </InfoWindow>
-        )}
-      </GoogleMap>
+      </MapContainer>
     </div>
   );
 }

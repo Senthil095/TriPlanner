@@ -1,5 +1,6 @@
 // SafetyTips Page - Solo travel safety information
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { metaApi } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, AlertTriangle, Phone, MapPin, ChevronDown, ChevronUp,
@@ -8,93 +9,43 @@ import {
 import AnimatedPage, { StaggerContainer, staggerItem } from '../components/ui/AnimatedPage';
 import GlassCard from '../components/ui/GlassCard';
 
-const safetyCategories = [
-  {
-    title: 'Before You Go',
-    icon: Globe,
-    color: 'from-blue-500 to-indigo-500',
-    tips: [
-      'Research your destination thoroughly — know the local laws, customs, and emergency numbers.',
-      'Share your complete itinerary with a trusted person and set check-in schedules.',
-      'Make digital copies of all important documents (passport, visa, insurance, prescriptions).',
-      'Register with your country\'s embassy or consulate at your destination.',
-      'Get appropriate travel insurance that covers medical emergencies and evacuation.',
-    ],
-  },
-  {
-    title: 'Accommodation Safety',
-    icon: Lock,
-    color: 'from-emerald-500 to-teal-500',
-    tips: [
-      'Always book accommodations with positive reviews and verified safety features.',
-      'Request rooms on higher floors (2nd-6th) — not ground floor, and avoid top floor for fire safety.',
-      'Check that doors and windows lock properly. Use a portable door lock or wedge.',
-      'Don\'t open the door for unexpected visitors. Verify with the front desk first.',
-      'Keep valuables in the hotel safe. Don\'t leave them visible in your room.',
-    ],
-  },
-  {
-    title: 'Women Safety',
-    icon: Heart,
-    color: 'from-pink-500 to-rose-500',
-    tips: [
-      'Trust your instincts. If something feels wrong, leave immediately.',
-      'Dress respectfully according to local customs to avoid unwanted attention.',
-      'Avoid sharing your travel plans or accommodation details with strangers.',
-      'Keep emergency contacts on speed dial and share live location with guardians.',
-      'Use official taxis or ride-sharing apps — avoid unmarked vehicles.',
-      'Carry a personal alarm or whistle for emergencies.',
-    ],
-  },
-  {
-    title: 'Digital Security',
-    icon: Wifi,
-    color: 'from-violet-500 to-purple-500',
-    tips: [
-      'Use a VPN on public Wi-Fi networks to protect your data.',
-      'Avoid accessing banking or sensitive accounts on public networks.',
-      'Enable two-factor authentication on all travel-related accounts.',
-      'Keep your devices charged — carry a portable power bank.',
-      'Don\'t post real-time location updates on social media.',
-    ],
-  },
-  {
-    title: 'Street Safety',
-    icon: Eye,
-    color: 'from-amber-500 to-orange-500',
-    tips: [
-      'Walk confidently and purposefully. Avoid looking lost or distracted.',
-      'Keep your phone and valuables secure. Use anti-theft bags.',
-      'Be aware of common scams at your destination. Research them beforehand.',
-      'Avoid poorly lit and deserted areas, especially at night.',
-      'Learn basic phrases in the local language, including "help" and "police".',
-    ],
-  },
-  {
-    title: 'Health & Emergency',
-    icon: Phone,
-    color: 'from-red-500 to-rose-600',
-    tips: [
-      'Carry a basic first-aid kit with personal medications.',
-      'Know the local emergency numbers and nearest hospital location.',
-      'Stay hydrated and be cautious with street food in new destinations.',
-      'If you have medical conditions, wear a medical ID bracelet.',
-      'Get any recommended vaccinations before traveling.',
-    ],
-  },
-];
-
-const emergencyNumbers = [
-  { country: 'USA/Canada', number: '911', emoji: '🇺🇸' },
-  { country: 'EU/UK', number: '112', emoji: '🇪🇺' },
-  { country: 'Japan', number: '110 (Police) / 119 (Fire/Ambulance)', emoji: '🇯🇵' },
-  { country: 'Australia', number: '000', emoji: '🇦🇺' },
-  { country: 'India', number: '112', emoji: '🇮🇳' },
-  { country: 'Thailand', number: '1669 (Medical) / 191 (Police)', emoji: '🇹🇭' },
-];
+const iconMap = {
+  Globe, Lock, Heart, Wifi, Eye, Phone
+};
 
 function SafetyTips() {
   const [openIndex, setOpenIndex] = useState(0);
+  const [safetyCategories, setSafetyCategories] = useState([]);
+  const [emergencyNumbers, setEmergencyNumbers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSafetyData = async () => {
+      try {
+        const [tipsData, numbersData] = await Promise.all([
+          metaApi.get('safety_tips'),
+          metaApi.get('emergency_numbers')
+        ]);
+
+        setSafetyCategories(tipsData.categories || []);
+        setEmergencyNumbers(numbersData.numbers || []);
+      } catch (error) {
+        console.error('Failed to fetch safety data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSafetyData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <AnimatedPage className="max-w-4xl mx-auto px-4 py-8 pb-24">
@@ -128,7 +79,7 @@ function SafetyTips() {
       {/* Safety Categories */}
       <div className="space-y-4 mb-10">
         {safetyCategories.map((cat, index) => {
-          const Icon = cat.icon;
+          const Icon = iconMap[cat.icon] || Shield;
           const isOpen = openIndex === index;
 
           return (

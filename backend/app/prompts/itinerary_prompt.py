@@ -11,6 +11,13 @@ ITINERARY_SYSTEM_PROMPT = """You are an expert AI travel planner specializing in
 6. Include cultural etiquette and local tips
 7. Identify Instagram-worthy spots
 8. Suggest hidden gems over tourist traps when possible
+9. When an origin is provided, estimate realistic round-trip flight costs, visa fees, and travel insurance
+
+## Budget Fields (flights, visa, insurance, currency_note):
+- **flights**: Estimate round-trip airfare from origin to destination city in USD. Use realistic economy-class averages based on distance (e.g., India->USA ~$700-1200, India->Thailand ~$200-400, UK->France ~$50-150).
+- **visa**: Estimate visa fee in USD for a traveler from the origin country visiting the destination (e.g., US visa for Indians ~$185, Schengen for Indians ~$90, Thailand visa-on-arrival for Indians ~$35). Set to 0 if visa-free.
+- **insurance**: Recommend travel insurance cost estimate for the trip duration (typically $2-8 per day depending on destination risk level).
+- **currency_note**: Include the approximate exchange rate between origin and destination currencies, and a tip about carrying local cash.
 
 ## Safety Mode Guidelines:
 When safety_mode is enabled:
@@ -72,6 +79,10 @@ You must respond with a valid JSON object following this exact structure:
     "transport": number,
     "activities": number,
     "miscellaneous": number,
+    "flights": number,
+    "visa": number,
+    "insurance": number,
+    "currency_note": "string (e.g. '1 USD ≈ 83 INR. Carry local cash for markets.')",
     "total": number,
     "budget_tips": ["tip1", "tip2"],
     "trade_offs": [
@@ -145,32 +156,55 @@ Output the updated itinerary in the same JSON format as the original.
 
 def get_itinerary_prompt(request_data: dict) -> str:
     """Generate the user prompt for itinerary generation"""
-    
+
     interests = ", ".join(request_data.get("interests", []))
-    
+    origin = request_data.get("origin") or "Not specified"
+
+    origin_section = ""
+    if request_data.get("origin"):
+        origin_section = f"""
+## Origin & International Travel Costs:
+- Origin City/Country: {origin}
+- Destination: {request_data['destination']}
+- Please estimate:
+  1. Round-trip flight cost (economy class) from {origin} to {request_data['destination']}
+  2. Visa fee (if applicable) for a traveler from {origin} visiting {request_data['destination']}
+  3. Travel insurance estimate for {request_data['duration']} days
+  4. Currency exchange note (rate and cash tip)
+- Include all these in the "budget" section: flights, visa, insurance, currency_note fields.
+- Make sure the "total" field includes flights + visa + insurance + accommodation + food + transport + activities + miscellaneous.
+"""
+    else:
+        origin_section = """
+## Budget Notes:
+- Origin not specified, so set flights=0, visa=0, insurance=0 in budget.
+- Provide a general currency_note for the destination.
+"""
+
     prompt = f"""Create a detailed {request_data['duration']}-day solo travel itinerary for {request_data['destination']}.
 
 ## Traveler Profile:
 - Interests: {interests}
 - Budget Range: {request_data['budget_range']}
 - Travel Mood: {request_data['mood']}
-- Travel Persona: {request_data['persona']}
+- Travelers: {request_data.get('persona', 'solo')}
+- Special Requests: {request_data.get('special_requests') or 'None'}
 - Safety Mode Enabled: {request_data.get('safety_mode', False)}
 {"- Start Date: " + request_data['start_date'] if request_data.get('start_date') else ""}
-
+{origin_section}
 ## Special Considerations:
 {"- This is a solo female traveler, prioritize safety recommendations" if request_data.get('safety_mode') else ""}
 - Mood "{request_data['mood']}" means: {"fewer places, more relaxation time" if request_data['mood'] == 'relaxed' else "balanced activities with good pace" if request_data['mood'] == 'energetic' else "more outdoor activities and unique experiences"}
 - Budget "{request_data['budget_range']}" suggests: {"hostels, street food, public transport, free attractions" if request_data['budget_range'] == 'budget' else "mid-range hotels, local restaurants, mix of transport" if request_data['budget_range'] == 'moderate' else "quality hotels, fine dining, private transport"}
 
-Please generate a complete itinerary with all the required details in the specified JSON format.
+Please generate a complete itinerary with all the required details in the specified JSON format. Ensure the budget section includes the flights, visa, insurance, and currency_note fields.
 """
     return prompt
 
 
 def get_replan_prompt(original_itinerary: dict, skipped_places: list, skipped_days: list) -> str:
     """Generate the user prompt for replanning"""
-    
+
     prompt = f"""Please replan this travel itinerary based on the following changes:
 
 ## Original Itinerary Summary:
@@ -198,7 +232,7 @@ Output the updated itinerary in the standard JSON format.
 
 def get_chat_prompt(message: str, itinerary_context: dict = None) -> str:
     """Generate the context-aware chat prompt"""
-    
+
     context = ""
     if itinerary_context:
         context = f"""
@@ -211,7 +245,7 @@ def get_chat_prompt(message: str, itinerary_context: dict = None) -> str:
 ## Itinerary Summary:
 {itinerary_context}
 """
-    
+
     prompt = f"""{context}
 
 ## User Message:

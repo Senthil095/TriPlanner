@@ -42,7 +42,7 @@ function Chatbot() {
       const response = await chatApi.send({ message: text.trim() });
       setMessages(prev => [
         ...prev,
-        { id: Date.now() + 1, role: 'assistant', content: response.data?.response || response.data?.message || 'I can help you plan your trip!' },
+        { id: Date.now() + 1, role: 'assistant', content: response.response || response.message || 'I can help you plan your trip!' },
       ]);
     } catch {
       setMessages(prev => [
@@ -101,8 +101,8 @@ function Chatbot() {
                 </div>
               )}
               <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                  ? 'bg-primary-500 text-white rounded-br-md'
-                  : 'glass-card rounded-bl-md'
+                ? 'bg-primary-500 text-white rounded-br-md'
+                : 'glass-card rounded-bl-md'
                 }`}>
                 <p className={msg.role === 'user' ? 'text-white' : 'text-surface-700 dark:text-surface-200'}>
                   {msg.content}

@@ -8,26 +8,35 @@ load_dotenv()
 
 class Settings(BaseSettings):
     # API Keys
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
-    google_maps_api_key: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
-    
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+
     # Firebase Configuration
     firebase_project_id: str = os.getenv("FIREBASE_PROJECT_ID", "")
     firebase_private_key: str = os.getenv("FIREBASE_PRIVATE_KEY", "").replace("\\n", "\n")
     firebase_client_email: str = os.getenv("FIREBASE_CLIENT_EMAIL", "")
     firebase_credentials_path: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
-    
+
     # App Configuration
     app_name: str = "AI Travel Planner"
     debug: bool = os.getenv("DEBUG", "false").lower() == "true"
-    
-    # Claude Configuration
-    claude_model: str = "claude-sonnet-4-20250514"
+
+    # LLM Max Tokens
     max_tokens: int = 8192
-    
+
+    # Groq Configuration
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_max_tokens: int = 4096
+
     # CORS Origins
     cors_origins: list = ["http://localhost:5173", "http://localhost:3000"]
-    
+
+    # SMTP / Email Configuration (used for Emergency SOS alerts)
+    smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "noreply@triplanner.app"))
+
     class Config:
         env_file = ".env"
 

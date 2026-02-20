@@ -15,6 +15,41 @@ from app.services.firebase_service import FirebaseService
 router = APIRouter(prefix="/api", tags=["hidden-gems"])
 
 
+@router.get("/hidden-gems/categories", response_model=List[str])
+async def get_gem_categories():
+    """
+    Get available categories for hidden gems.
+    """
+    return [
+        "food",
+        "nature",
+        "culture",
+        "nightlife",
+        "shopping",
+        "art",
+        "history",
+        "viewpoint",
+        "relaxation",
+        "adventure"
+    ]
+
+
+@router.get("/hidden-gems/featured", response_model=List[Dict[str, Any]])
+async def get_featured_gems():
+    """
+    Get featured hidden gems across all cities.
+    
+    Returns a curated selection of top-rated hidden gems.
+    """
+    # Mock featured gems for demonstration
+    try:
+        firebase_service = FirebaseService()
+        gems = await firebase_service.get_featured_hidden_gems()
+        return gems
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/hidden-gems/{city}", response_model=List[Dict[str, Any]])
 async def get_hidden_gems(city: str, limit: int = 20):
     """
@@ -78,59 +113,4 @@ async def submit_hidden_gem(request: HiddenGemSubmission):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/hidden-gems/categories", response_model=List[str])
-async def get_gem_categories():
-    """
-    Get available categories for hidden gems.
-    """
-    return [
-        "food",
-        "nature",
-        "culture",
-        "nightlife",
-        "shopping",
-        "art",
-        "history",
-        "viewpoint",
-        "relaxation",
-        "adventure"
-    ]
 
-
-@router.get("/hidden-gems/featured", response_model=List[Dict[str, Any]])
-async def get_featured_gems():
-    """
-    Get featured hidden gems across all cities.
-    
-    Returns a curated selection of top-rated hidden gems.
-    """
-    # Mock featured gems for demonstration
-    return [
-        {
-            "id": "featured-1",
-            "name": "Secret Rooftop Garden",
-            "city": "Tokyo",
-            "description": "A hidden garden on top of an old building in Shimokitazawa",
-            "category": "nature",
-            "rating": 4.9,
-            "inversePopularityRank": 3.2
-        },
-        {
-            "id": "featured-2",
-            "name": "Underground Jazz Bar",
-            "city": "Paris",
-            "description": "Authentic jazz experience in a converted wine cellar",
-            "category": "nightlife",
-            "rating": 4.8,
-            "inversePopularityRank": 3.0
-        },
-        {
-            "id": "featured-3",
-            "name": "Local Market Alley",
-            "city": "Bangkok",
-            "description": "Where locals shop - amazing street food and fresh produce",
-            "category": "food",
-            "rating": 4.7,
-            "inversePopularityRank": 2.9
-        }
-    ]
